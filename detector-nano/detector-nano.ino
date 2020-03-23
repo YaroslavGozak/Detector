@@ -3,9 +3,9 @@
 
 #define DEBUG
 
-SoftwareSerial mySerial(8, 9);
-const byte SPEAKER_PIN = 10;
-const byte LED_PIN = 12;
+SoftwareSerial mySerial(7, 8);
+const byte SPEAKER_PIN = 1;
+const byte LED_PIN = 2;
 const int ON_DURATION = 100;
 
 unsigned long lastPeriodStart = millis();
