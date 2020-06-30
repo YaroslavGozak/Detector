@@ -2,10 +2,24 @@
 #include <limits.h>
 
 #define DEBUG
+#define DETAIL
+#define NANO
 
-SoftwareSerial mySerial(8, 9);
-const byte SPEAKER_PIN = 10;
-const byte LED_PIN = 12;
+#ifdef UNO
+  SoftwareSerial mySerial(8, 9);
+  const byte SPEAKER_PIN = 10;
+  const byte LED_PIN = 12;
+#endif
+
+#ifdef NANO
+  SoftwareSerial mySerial(7, 8);
+  const byte SPEAKER_PIN = 4;
+  const byte LED_PIN = 2;
+#endif
+
+#define WIFI_SERIAL    mySerial
+
+
 const int ON_DURATION = 100;
 
 unsigned long lastPeriodStart = millis();
@@ -14,16 +28,13 @@ bool isSignaling = false;
 String inString = "";    // string to hold input
 int testStrength = 0;
 
-#define WIFI_SERIAL    mySerial
-#define WIFI_DEGUG
-
 void setup() {
   pinMode(SPEAKER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   // открываем последовательный порт для мониторинга действий в программе
   // и передаём скорость 115200 бод
 #ifdef DEBUG
-  Serial.begin(115200);
+  Serial.begin(9600);
   while (!Serial) {
     // ждём, пока не откроется монитор последовательного поcрта
     // для того, чтобы отследить все события в программе
@@ -37,7 +48,9 @@ void setup() {
     // ждём, пока не откроется монитор последовательного порта
     // для того, чтобы отследить все события в программе
   }
+#ifdef DEBUG
   Serial.print("WIFI_SERIAL init OK\r\n");
+#endif
 }
 
 void loop() {
@@ -120,8 +133,8 @@ int calculatePeriodDuration(int strength) {
     return INT_MAX;
   }
 
-  double product = strength * 5;
-  double timesPerSecond = product / 500.0; // От 0 до 10
+  double product = strength;
+  double timesPerSecond = product / 100.0; // От 0 до 5
   int duration = 1000 / timesPerSecond;
 
   Serial.print("Prod: ");
