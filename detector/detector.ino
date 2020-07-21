@@ -1,32 +1,39 @@
 #include <SoftwareSerial.h>
 #include <limits.h>
+#include <SPI.h>
+#include <SD.h>
 
-#define DEBUG
-#define DETAIL
+//#define DEBUG
+//#define DETAIL
 #define NANO
 
 #ifdef UNO
   SoftwareSerial mySerial(8, 9);
   const byte SPEAKER_PIN = 10;
   const byte LED_PIN = 12;
+  const byte VOLTAGE_PIN = A1;
 #endif
 
 #ifdef NANO
   SoftwareSerial mySerial(7, 8);
   const byte SPEAKER_PIN = 4;
   const byte LED_PIN = 2;
+  const byte VOLTAGE_PIN = A6;
 #endif
 
 #define WIFI_SERIAL    mySerial
 
-
+File logFile;
 const int ON_DURATION = 100;
-
+// максимальный заряд аккумулятора
+float max_v = 4.20; 
+// минимальный заряд аккумулятора
+float min_v = 2.75; 
 unsigned long lastPeriodStart = millis();
 int periodDuration = INT_MAX;
 bool isSignaling = false;
 String inString = "";    // string to hold input
-int testStrength = 0;
+String logText = "";
 
 void setup() {
   pinMode(SPEAKER_PIN, OUTPUT);
@@ -34,7 +41,7 @@ void setup() {
   // открываем последовательный порт для мониторинга действий в программе
   // и передаём скорость 115200 бод
 #ifdef DEBUG
-  Serial.begin(9600);
+  Serial.begin(4800);
   while (!Serial) {
     // ждём, пока не откроется монитор последовательного поcрта
     // для того, чтобы отследить все события в программе
@@ -51,6 +58,23 @@ void setup() {
 #ifdef DEBUG
   Serial.print("WIFI_SERIAL init OK\r\n");
 #endif
+
+  Serial.print("Initializing SD card...");
+  if (!SD.begin(10)) {
+    Serial.println("initialization failed!");
+    tone(SPEAKER_PIN, 550, 1000);
+    delay(1000);
+    signalOff();
+  }
+  else{
+    for(int i = 0; i < 2; i++){
+      signalOn();
+      delay(100);
+      signalOff();
+      delay(100);
+    }
+  }
+  delay(2000);
 }
 
 void loop() {
@@ -67,8 +91,30 @@ void process() {
     }
     if (inChar == '\n') {
       int strength = constrain(inString.toInt(), 0, 1000);
-      testStrength++;
       periodDuration = calculatePeriodDuration(strength);
+
+      Serial.print("Logging :");
+      String debugText = String(strength);
+      debugText = debugText + " : ";
+      debugText = debugText + String(logText.length());
+      Serial.println(debugText);
+      int textLength = logText.length();
+      if(textLength < 20){
+        logText = logText + String(millis()) + " : " + String(strength) + "\n";
+      }
+      else{
+        textLength = logText.length();
+        logFile = SD.open("log.txt", FILE_WRITE);
+        // if the file opened okay, write to it:
+        if (logFile) {
+          Serial.println("Writing to log.txt...");
+          char charBuf[textLength];
+          logText.toCharArray(charBuf, textLength);
+          logFile.write(charBuf);
+          logFile.close();
+          logText = "\n";
+        }
+      }
 
 #ifdef DEBUG
       Serial.print("Strength:");
@@ -79,6 +125,10 @@ void process() {
 
       // clear the string for new input:
       inString = "";
+      // log to sd if possible
+      logData(String(strength));
+
+      float perc = getVoltagePercentage();
     }
   }
 
@@ -159,3 +209,37 @@ bool isTimeToSignal() {
 bool isTimeToStopSignal() {
   return isSignaling && millis() - lastPeriodStart >= ON_DURATION;
 }
+
+void logData(String text){
+  Serial.print("Logging :");
+  Serial.println(text + " : " + logText.length());
+  if(logText.length() < 200){
+    logText += text + "\n";
+  }
+  else{
+    logFile = SD.open("log.txt", FILE_WRITE);
+    // if the file opened okay, write to it:
+    if (logFile) {
+      Serial.print("Writing to log.txt...");
+      char charBuf[logText.length()];
+      logText.toCharArray(charBuf, logText.length());
+      logFile.write(charBuf);
+      logFile.close();
+      logText = "";
+    }
+  }
+}
+
+float getVoltagePercentage(){
+  float pinValue = analogRead(VOLTAGE_PIN);
+  Serial.println(pinValue);
+  float Vbat = (pinValue * 1.1) / 1023;
+  float del = 0.091; // R2/(R1+R2)  0.99кОм / (9.88кОм + 0.99кОм)
+  float Vin = Vbat / del;
+  // уровень заряда в процентах
+  int proc = ((Vin - min_v) / (max_v - min_v)) * 100;
+  // вывод данных в монитор порта
+  Serial.println(String(Vin) + " - " + String(proc));
+  return proc;
+}
+
