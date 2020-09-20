@@ -21,7 +21,10 @@ int32_t getRSSI() {
   byte available_networks = WiFi.scanNetworks();
   int strength = 0;
   for (int network = 0; network < available_networks; network++) {
-    strength += abs(WiFi.RSSI(network));
+    String ssid = WiFi.SSID(network);
+    if(ssid.indexOf("-POI-") >= 0){
+      strength += abs(WiFi.RSSI(network));
+    }    
   }
   return strength;
 }

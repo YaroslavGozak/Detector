@@ -1,9 +1,9 @@
-#include <SoftwareSerial.h>
+ #include <SoftwareSerial.h>
 #include <limits.h>
 #include <SPI.h>
 #include <SD.h>
 
-//#define DEBUG
+#define DEBUG
 //#define DETAIL
 #define NANO
 
@@ -18,6 +18,7 @@
   SoftwareSerial mySerial(7, 8);
   const byte SPEAKER_PIN = 4;
   const byte LED_PIN = 2;
+  const byte POWER_LED_PIN = 6;
   const byte VOLTAGE_PIN = A6;
 #endif
 
@@ -38,6 +39,8 @@ String logText = "";
 void setup() {
   pinMode(SPEAKER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(POWER_LED_PIN, OUTPUT);
+  digitalWrite(POWER_LED_PIN, HIGH);
   // открываем последовательный порт для мониторинга действий в программе
   // и передаём скорость 115200 бод
 #ifdef DEBUG
@@ -90,7 +93,7 @@ void process() {
       inString += (char)inChar;
     }
     if (inChar == '\n') {
-      int strength = constrain(inString.toInt(), 0, 1000);
+      int strength = inString.toInt();
       periodDuration = calculatePeriodDuration(strength);
 
       Serial.print("Logging :");
@@ -177,14 +180,15 @@ void signalOff() {
 }
 
 int calculatePeriodDuration(int strength) {
-  // strength : [0:1000]
+  strength = constrain(strength, 0, 100);
+  // strength : [0:100]
 
   if (strength < 4) {
     return INT_MAX;
   }
 
   double product = strength;
-  double timesPerSecond = product / 100.0; // От 0 до 5
+  double timesPerSecond = product / 10.0; // От 0 до 10
   int duration = 1000 / timesPerSecond;
 
   Serial.print("Prod: ");
@@ -242,4 +246,3 @@ float getVoltagePercentage(){
   Serial.println(String(Vin) + " - " + String(proc));
   return proc;
 }
-
