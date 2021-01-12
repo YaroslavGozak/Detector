@@ -1,50 +1,53 @@
-#include <TM1637.h>
-#define MINUTES 14
-#define SECONDS 59
+#include <GyverTM1637.h>
+#define MINUTES 0
+#define SECONDS 30
+#define ON 1
+#define OFF 0
 
-#define LEFT_BUTTON_PIN 7
-#define RIGHT_BUTTON_PIN 9
-#define SIGNAL_PIN 11
-#define RIGHT 1
-#define LEFT 2
-#define MIDDLE 3
+#define NODEMCU
 
-// Instantiation and pins configurations
-// Pin 3 - > DIO
-// Pin 2 - > CLK
-TM1637 tm1637(2, 3);
-int leftButtonState = 0;
-int rightButtonState = 0; 
+#ifdef NODEMCU
+
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+
+GyverTM1637 disp(5,4);
+const int BUTTON_PIN = 12;
+const char* ssid = "M200";
+const char* password = "P@ssword";
+const int LED_PIN = 13;
+
+#endif
+
+int buttonState = 0;
 bool isAnomalyOn = true;
 int lastSwitchPosition;
-int newSwitch = 0;
+int newSwitch = -1;
 
 void setup()
 {
-    tm1637.init();
-    tm1637.setBrightness(1);
-    tm1637.colonOn();
-    tm1637.display("----");
+  Serial.begin(9600);
+  delay(10);
+  Serial.print("Starting... ");
+  disp.clear();
+  disp.brightness(7);
+  disp.point(true);
 
-    pinMode(LEFT_BUTTON_PIN, INPUT);
-    pinMode(RIGHT_BUTTON_PIN, INPUT);
+  pinMode(BUTTON_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
 
-    leftButtonState = digitalRead(LEFT_BUTTON_PIN);
-    rightButtonState = digitalRead(RIGHT_BUTTON_PIN);
-    if(leftButtonState == HIGH){
-      lastSwitchPosition = LEFT;
-    }
-    if(rightButtonState == HIGH){
-      lastSwitchPosition = RIGHT;
-    }
-    else{
-      lastSwitchPosition = MIDDLE;
-    }
+  buttonState = digitalRead(BUTTON_PIN);
+  if(buttonState == HIGH){
+    lastSwitchPosition = ON;
+  }
+  else{
+    lastSwitchPosition = OFF;
+  }
 
-    Serial.begin(9600);
-    Serial.print("lastSwitchPosition: "); Serial.println(lastSwitchPosition);
+  Serial.print("lastSwitchPosition: "); Serial.println(lastSwitchPosition);
 
-    turnAnomalyOn();
+  turnAnomalyOn();
 }
 
 void loop()
@@ -52,46 +55,35 @@ void loop()
   if(isAnomalyOn == false){
     // timer goes
     for (int minutes = MINUTES ; minutes >= 0; minutes--) {
-        for (int seconds = SECONDS; seconds >= 0 ; seconds--) {
+      int seconds = 59;
+      if(MINUTES == 0){
+        seconds = SECONDS;
+      }
+        for ( ; seconds >= 0 ; seconds--) {
             delay(1000);          // Waits for 1 second = 1000 millisecond.
-            tm1637.display(seconds + minutes * 100);
+            //tm1637.display(seconds + minutes * 100);
+            disp.displayClock(minutes, seconds);
 
-            if(detectSwitchChanges()){
-              minutes = MINUTES;
-              seconds = SECONDS;
-            }   
+           // if(detectSwitchChanges()){
+           //   minutes = MINUTES;
+           //   seconds = SECONDS;
+           // }   
         }
     }
     turnAnomalyOn();
   }
   else{
-    tm1637.display("----");
-    //digitalWrite(SIGNAL_PIN, HIGH);
+    //tm1637.display("----");
+    disp.displayByte(_dash,_dash,_dash,_dash);
   }
   if(detectSwitchChanges()){
     turnAnomalyOff();
   }
 }
 
-int checkSwitchState(){
-  bool isRightSwitch = (digitalRead(RIGHT_BUTTON_PIN) == HIGH);
-  bool isLeftSwitch = (digitalRead(LEFT_BUTTON_PIN) == HIGH);
-  bool stateChanged = (isLeftSwitch && lastSwitchPosition != LEFT) || (isRightSwitch && lastSwitchPosition != RIGHT);
-
-  if(stateChanged){
-   if(isLeftSwitch){
-     return LEFT;
-   }
-   else{
-     return RIGHT;
-   }
-  }
-  return 0;
-}
-
 bool detectSwitchChanges(){
   newSwitch = checkSwitchState();
-  if(newSwitch != 0){
+  if(newSwitch != -1){
     // Turn off anomaly if switch was toggled
     Serial.println("Changes happened");
     Serial.print("Was switched from "); Serial.print(lastSwitchPosition);Serial.print(" to "); Serial.println(newSwitch);
@@ -101,12 +93,33 @@ bool detectSwitchChanges(){
   return false;
 }
 
+int checkSwitchState(){
+  bool isSwitch = (digitalRead(BUTTON_PIN) == HIGH);
+  bool stateChanged = isSwitch != (lastSwitchPosition == ON);
+
+  if(stateChanged){
+   return isSwitch;
+  }
+  return -1;
+}
+
+
+
 void turnAnomalyOn(){
   isAnomalyOn = true;
-  digitalWrite(SIGNAL_PIN, HIGH);
+  Serial.println("Turning on...");
+  #ifdef NODEMCU
+    WiFi.softAP(ssid, password); //begin WiFi access point
+    digitalWrite(LED_PIN, HIGH);
+  #endif
 }
 
 void turnAnomalyOff(){
   isAnomalyOn = false;
-  digitalWrite(SIGNAL_PIN, LOW);
+  Serial.println("Turning off...");
+  #ifdef NODEMCU
+    WiFi.softAPdisconnect(true);
+    digitalWrite(LED_PIN, LOW);
+  #endif
+ 
 }

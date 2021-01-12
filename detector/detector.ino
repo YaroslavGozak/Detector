@@ -1,4 +1,4 @@
- #include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
 #include <limits.h>
 #include <SPI.h>
 #include <SD.h>
@@ -200,8 +200,6 @@ int calculatePeriodDuration(int strength) {
 
   duration = constrain(duration, ON_DURATION, 2.5 * 1000);
   duration += 15;
-
-
 
   return duration;
 }
